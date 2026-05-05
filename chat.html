@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>千叶 · 你的情感陪伴</title>
+    <style>
+        :root {
+            /* 手机尺寸缩小 10% */
+            --phone-width: 337px;
+            --phone-height: 675px;
+            --accent: #e07b6c;
+            --text-light: #fff;
+            --glass-bg: rgba(20, 20, 20, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --font-family: 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #2c2c2c;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: var(--font-family);
+            user-select: none;
+        }
+
+        .phone {
+            width: var(--phone-width);
+            height: var(--phone-height);
+            background: #000;
+            border-radius: 40px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 场景层 */
+        .scene {
+            flex: 1;
+            position: relative;
+            background-color: #aad0d9;
+            background-image: url('images/bg_room.png');
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+        }
+
+        /* 立绘容器 */
+        .character-container {
+            position: absolute;
+            bottom: -12%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 92%;
+            height: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            pointer-events: none;
+            z-index: 1;
+            transition: transform 0.2s ease;
+        }
+
+        .character-container img,
+        .character-container video {
+            max-width: 100%;
+            max-height: 75vh;
+            object-fit: contain;
+            transition: opacity 0.3s ease;
+        }
+
+        /* 立绘动画 */
+        .animate-bounce {
+            animation: bounceAnim 0.5s ease;
+        }
+
+        @keyframes bounceAnim {
+            0% { transform: translateX(-50%) translateY(0); }
+            30% { transform: translateX(-50%) translateY(-14px); }
+            50% { transform: translateX(-50%) translateY(0); }
+            70% { transform: translateX(-50%) translateY(-6px); }
+            100% { transform: translateX(-50%) translateY(0); }
+        }
+
+        .animate-sway {
+            animation: swayAnim 2.5s ease;
+        }
+
+        @keyframes swayAnim {
+            0% { transform: translateX(-50%) rotate(0deg); }
+            15% { transform: translateX(-50%) rotate(-2.5deg); }
+            30% { transform: translateX(-50%) rotate(2deg); }
+            45% { transform: translateX(-50%) rotate(-1.5deg); }
+            60% { transform: translateX(-50%) rotate(1deg); }
+            75% { transform: translateX(-50%) rotate(-0.5deg); }
+            100% { transform: translateX(-50%) rotate(0deg); }
+        }
+
+        /* 角色气泡 */
+        .dialogue-bubble {
+            position: absolute;
+            bottom: 28%;
+            left: 6%;
+            right: 6%;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 14px 18px;
+            color: var(--text-light);
+            font-size: 15px;
+            line-height: 1.6;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+            word-break: break-word;
+            white-space: pre-wrap;
+            z-index: 10;
+            transition: opacity 0.5s ease;
+        }
+
+        /* 用户气泡容器 */
+        .user-bubble-area {
+            position: absolute;
+            bottom: 70px;
+            left: 10%;
+            right: 10%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .user-bubble {
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+            font-size: 14px;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            word-break: break-word;
+            animation: fadeInOut 6s ease forwards;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(10px); }
+            10% { opacity: 1; transform: translateY(0); }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-5px); }
+        }
+
+        /* 输入区域 */
+        .input-area {
+            height: 60px;
+            background: rgba(20, 20, 20, 0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            gap: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 5;
+            margin-bottom: 8px; /* 输入栏上移，不贴底 */
+        }
+
+        .input-area input {
+            flex: 1;
+            height: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            padding: 0 16px;
+            font-size: 15px;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .input-area input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .input-area button {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(224, 123, 108, 0.5);
+            transition: all 0.2s;
+        }
+
+        /* 顶部按钮区域 */
+        .top-buttons {
+            position: absolute;
+            top: 15px; /* 向下移动了 15px，可自行调整 */
+            width: 100%;
+            padding: 0 16px; /* 左右内边距 */
+            display: flex;
+            justify-content: space-between;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .icon-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            pointer-events: auto;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            /* 确保文字图标居中 */
+            line-height: 1;
+        }
+
+        /* 历史记录模态框 */
+        .history-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .history-modal.active {
+            display: flex;
+        }
+
+        .history-panel {
+            width: 90%;
+            max-width: 400px;
+            height: 80%;
+            background: #1b1b1b;
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        .history-header {
+            padding: 16px;
+            text-align: center;
+            color: #fff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-header span {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .history-item {
+            display: flex;
+            flex-direction: column;
+            max-width: 80%;
+        }
+
+        .history-item.user {
+            align-self: flex-end;
+        }
+
+        .history-item.assistant {
+            align-self: flex-start;
+        }
+
+        .history-bubble {
+            padding: 10px 14px;
+            border-radius: 18px;
+            font-size: 14px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .history-item.user .history-bubble {
+            background: #5b8c5a;
+            color: #fff;
+            border-bottom-right-radius: 6px;
+        }
+
+        .history-item.assistant .history-bubble {
+            background: #333;
+            color: #eee;
+            border-bottom-left-radius: 6px;
+        }
+
+        .history-empty {
+            color: #888;
+            text-align: center;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="phone">
+    <div class="top-buttons">
+        <!-- 返回按钮保持不变 -->
+        <div class="icon-btn" title="返回">←</div>
+        <!-- 历史按钮改为黑白平面图标“☰” -->
+        <div class="icon-btn" id="historyBtn" title="历史记录">☰</div>
+    </div>
+
+    <div class="scene" id="scene">
+        <div class="character-container" id="characterContainer">
+            <img id="characterImage" src="images/千叶_neutral.png" alt="千叶">
+            <video id="characterVideo" style="display: none;" loop muted playsinline></video>
+        </div>
+
+        <div class="dialogue-bubble" id="dialogueBubble" style="opacity: 0;">你好...</div>
+
+        <div class="user-bubble-area" id="userBubbleArea"></div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="和千叶说点什么..." onkeydown="if(event.key==='Enter')sendMessage()">
+        <button onclick="sendMessage()">➤</button>
+    </div>
+</div>
+
+<!-- 历史记录模态框 -->
+<div class="history-modal" id="historyModal">
+    <div class="history-panel">
+        <div class="history-header">
+            <span>聊天记录</span>
+            <span class="close-btn" id="closeHistoryBtn">关闭</span>
+        </div>
+        <div class="history-list" id="historyList">
+            <div class="history-empty">暂无聊天记录</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = '/api/chat';
+    const API_KEY = 'app-rWoRY038y5T1EDnJUnTSpktx';
+    const ASSET_BASE = 'images/';
+
+    const emotionMediaMap = {
+        happy: { image: '千叶_happy.png' },
+        sad: { image: '千叶_neutral.png' },
+        surprised: { image: '千叶_happy.png' },
+        angry: { image: '千叶_angry.png' },
+        professional: { image: '千叶_neutral.png' },
+        neutral: { image: '千叶_neutral.png' }
+    };
+
+    const openingLines = [
+        { text: '嗨！我是千叶，今天背书背得有点头晕，见到你真开心～', emotion: 'happy' },
+        { text: '唔…刚上完课，太累了……你来找我聊天真是太好了。', emotion: 'sad' },
+        { text: '咦？！你突然出现吓我一跳！', emotion: 'surprised' },
+        { text: '我今天在图书馆泡了一整天，脑袋里全是医学名词……求聊点轻松的事情！', emotion: 'neutral' },
+        { text: '（正在偷偷吃零食）啊，被发现了！快帮我保密，别告诉导师我在这里～', emotion: 'happy' }
+    ];
+
+    let conversationId = '';
+    let chatHistory = [];
+
+    const dialogueBubble = document.getElementById('dialogueBubble');
+    const characterImg = document.getElementById('characterImage');
+    const characterVideo = document.getElementById('characterVideo');
+    const characterContainer = document.getElementById('characterContainer');
+    const userBubbleArea = document.getElementById('userBubbleArea');
+    const historyModal = document.getElementById('historyModal');
+    const historyList = document.getElementById('historyList');
+    const historyBtn = document.getElementById('historyBtn');
+    const closeHistoryBtn = document.getElementById('closeHistoryBtn');
+
+    function setCharacterEmotion(emotion) {
+        const media = emotionMediaMap[emotion] || emotionMediaMap.neutral;
+        if (characterVideo) {
+            characterVideo.style.display = 'none';
+            characterVideo.pause();
+        }
+        if (characterImg) {
+            characterImg.style.display = 'block';
+            characterImg.src = ASSET_BASE + media.image;
+        }
+        if (media.video && characterVideo) {
+            characterImg.style.display = 'none';
+            characterVideo.src = ASSET_BASE + media.video;
+            characterVideo.style.display = 'block';
+            characterVideo.play().catch(() => {});
+        }
+
+        triggerEmotionAnimation(emotion);
+    }
+
+    function triggerEmotionAnimation(emotion) {
+        characterContainer.classList.remove('animate-bounce', 'animate-sway');
+        void characterContainer.offsetWidth;
+        if (emotion === 'happy' || emotion === 'surprised') {
+            characterContainer.classList.add('animate-bounce');
+        } else if (emotion === 'sad') {
+            characterContainer.classList.add('animate-sway');
+        }
+        const onAnimEnd = () => {
+            characterContainer.classList.remove('animate-bounce', 'animate-sway');
+            characterContainer.removeEventListener('animationend', onAnimEnd);
+        };
+        characterContainer.addEventListener('animationend', onAnimEnd);
+    }
+
+    function setDialogueText(text) {
+        dialogueBubble.textContent = text;
+        dialogueBubble.style.opacity = '1';
+    }
+
+    function hideDialogueBubble() {
+        dialogueBubble.style.opacity = '0';
+    }
+
+    function showUserBubble(text) {
+        const bubble = document.createElement('div');
+        bubble.className = 'user-bubble';
+        bubble.textContent = text;
+        userBubbleArea.appendChild(bubble);
+        setTimeout(() => {
+            if (bubble.parentNode) {
+                bubble.style.opacity = '0';
+                setTimeout(() => bubble.remove(), 300);
+            }
+        }, 6000);
+    }
+
+    function splitResponseSmart(fullText) {
+        const MAX_CHARS_PER_LINE = 18;
+        const MAX_LINES = 3;
+        const MIN_SENTENCE_LENGTH = 5;
+
+        if (fullText.length <= MAX_CHARS_PER_LINE * MAX_LINES) {
+            return [fullText];
+        }
+
+        const rawSentences = fullText.match(/[^。！？；!?;]+[。！？；!?;]?/g) || [fullText];
+        if (rawSentences.length <= 1) return [fullText];
+
+        const merged = [];
+        for (let i = 0; i < rawSentences.length; i++) {
+            const s = rawSentences[i].trim();
+            if (!s) continue;
+            if (s.length < MIN_SENTENCE_LENGTH && merged.length > 0) {
+                merged[merged.length - 1] += s;
+            } else {
+                merged.push(s);
+            }
+        }
+
+        if (merged.length === 1) return merged;
+
+        if (merged[merged.length - 1].length < MIN_SENTENCE_LENGTH && merged.length > 1) {
+            merged[merged.length - 2] += merged[merged.length - 1];
+            merged.pop();
+        }
+
+        return merged;
+    }
+
+    async function splitAndShowResponse(fullText, emotion) {
+        const sentences = splitResponseSmart(fullText);
+        if (sentences.length === 0) {
+            setDialogueText('');
+            return;
+        }
+
+        setCharacterEmotion(emotion);
+
+        for (let i = 0; i < sentences.length; i++) {
+            const sentence = sentences[i].trim();
+            if (!sentence) continue;
+
+            setDialogueText(sentence);
+
+            if (i === sentences.length - 1) {
+                setTimeout(() => {
+                    hideDialogueBubble();
+                }, 20000);
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+        }
+    }
+
+    function showRandomOpening() {
+        const randomIndex = Math.floor(Math.random() * openingLines.length);
+        const opening = openingLines[randomIndex];
+        splitAndShowResponse(opening.text, opening.emotion);
+    }
+
+    function renderHistory() {
+        historyList.innerHTML = '';
+        if (chatHistory.length === 0) {
+            historyList.innerHTML = '<div class="history-empty">暂无聊天记录</div>';
+            return;
+        }
+        chatHistory.forEach(item => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = `history-item ${item.role}`;
+            const bubble = document.createElement('div');
+            bubble.className = 'history-bubble';
+            bubble.textContent = item.content;
+            itemDiv.appendChild(bubble);
+            historyList.appendChild(itemDiv);
+        });
+        historyList.scrollTop = historyList.scrollHeight;
+    }
+
+    function openHistory() {
+        renderHistory();
+        historyModal.classList.add('active');
+    }
+
+    function closeHistory() {
+        historyModal.classList.remove('active');
+    }
+
+    historyBtn.addEventListener('click', openHistory);
+    closeHistoryBtn.addEventListener('click', closeHistory);
+    historyModal.addEventListener('click', (e) => {
+        if (e.target === historyModal) closeHistory();
+    });
+
+    async function sendMessage() {
+        const input = document.getElementById('userInput');
+        const userText = input.value.trim();
+        if (!userText) return;
+
+        showUserBubble(userText);
+        chatHistory.push({ role: 'user', content: userText });
+
+        input.value = '';
+        input.focus();
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    inputs: {},
+                    query: userText,
+                    response_mode: 'blocking',
+                    conversation_id: conversationId,
+                    user: 'demo-user'
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error('HTTP ' + response.status + ': ' + errorText);
+            }
+
+            const data = await response.json();
+            conversationId = data.conversation_id;
+
+            const rawAnswer = data.answer || '';
+            let chibaText = rawAnswer;
+            let chibaEmotion = 'neutral';
+
+            try {
+                let cleaned = rawAnswer.replace(/```json|```/g, '').trim();
+                const parsed = JSON.parse(cleaned);
+                if (parsed.text) chibaText = parsed.text;
+                if (parsed.emotion) chibaEmotion = parsed.emotion;
+            } catch (e) {
+                const match = rawAnswer.match(/\{[^{}]*"text"\s*:\s*".*?"\s*,\s*"emotion"\s*:\s*".*?"\s*\}/);
+                if (match) {
+                    try {
+                        const extracted = JSON.parse(match[0]);
+                        if (extracted.text) chibaText = extracted.text;
+                        if (extracted.emotion) chibaEmotion = extracted.emotion;
+                    } catch (innerErr) {}
+                }
+            }
+
+            chatHistory.push({ role: 'assistant', content: chibaText });
+            splitAndShowResponse(chibaText, chibaEmotion);
+
+        } catch (error) {
+            console.error('调用失败：', error);
+            setCharacterEmotion('sad');
+            setDialogueText('（千叶好像掉线了，稍等一下再试试吧）');
+            setTimeout(() => hideDialogueBubble(), 5000);
+        }
+    }
+
+    window.addEventListener('load', () => {
+        showRandomOpening();
+    });
+</script>
+
+</body>
+</html>
