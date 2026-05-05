@@ -1,25 +1,17 @@
 // api/chat.js
-// Vercel Serverless Function，用于代理请求到 Dify API
-const https = require('https');
-
-const DIFY_API_KEY = process.env.DIFY_API_KEY; // 部署时设置环境变量
-const DIFY_HOST = 'api.dify.ai';
-const DIFY_PATH = '/v1/chat-messages';
-
-export default function handler(req, res) {
-    // 允许跨域
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-
+export default async function handler(req, res) {
+    // 只允许 POST 请求
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
+        return res.status(405).json({ error: 'Method not allowed' });
     }
+
+    const DIFY_API_KEY = process.env.DIFY_API_KEY; // 从环境变量读取
+    const DIFY_HOST = 'api.dify.ai';
+    const DIFY_PATH = '/v1/chat-messages';
 
     const postData = JSON.stringify(req.body);
 
+    const https = require('https');
     const options = {
         hostname: DIFY_HOST,
         path: DIFY_PATH,
@@ -31,22 +23,20 @@ export default function handler(req, res) {
         }
     };
 
-    const proxyReq = https.request(options, (proxyRes) => {
-        let data = '';
-        proxyRes.on('data', (chunk) => { data += chunk; });
-        proxyRes.on('end', () => {
-            try {
-                res.status(proxyRes.statusCode).json(JSON.parse(data));
-            } catch (e) {
-                res.status(500).json({ error: 'Dify 返回非 JSON', raw: data });
-            }
+    try {
+        const difyResponse = await new Promise((resolve, reject) => {
+            const proxyReq = https.request(options, (proxyRes) => {
+                let data = '';
+                proxyRes.on('data', (chunk) => { data += chunk; });
+                proxyRes.on('end', () => resolve({ statusCode: proxyRes.statusCode, data }));
+            });
+            proxyReq.on('error', reject);
+            proxyReq.write(postData);
+            proxyReq.end();
         });
-    });
 
-    proxyReq.on('error', (err) => {
-        res.status(500).json({ error: err.message });
-    });
-
-    proxyReq.write(postData);
-    proxyReq.end();
+        res.status(difyResponse.statusCode).json(JSON.parse(difyResponse.data));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 }
