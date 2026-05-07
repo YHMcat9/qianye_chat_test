@@ -1,11 +1,21 @@
 // api/chat.js
 export default async function handler(req, res) {
-    // 只允许 POST 请求
+    // 1. 设置 CORS 头 —— 允许任何来源（适合演示）
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+
+    // 2. 处理预检请求
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
+    // 3. 只允许 POST 请求
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const DIFY_API_KEY = process.env.DIFY_API_KEY; // 从环境变量读取
+    const DIFY_API_KEY = process.env.DIFY_API_KEY;
     const DIFY_HOST = 'api.dify.ai';
     const DIFY_PATH = '/v1/chat-messages';
 
