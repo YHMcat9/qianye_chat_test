@@ -30,6 +30,7 @@
     --coral:#E07B6C;
     --ink:#1B3A6B;
     --paper:#F4F6FA;
+    --surround:#F4F6FA;       /* the band around the frame, set from CONFIG */
     --fw:402;                 /* prototype frame size, set from CONFIG */
     --fh:874;
     --ease:cubic-bezier(.22,.8,.28,1);
@@ -42,7 +43,7 @@
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{
     height:100%;margin:0;padding:0;
-    background:var(--paper);
+    background:var(--surround);
     overscroll-behavior:none;
     font-family:"DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     color:var(--ink);
@@ -61,8 +62,15 @@
     background:var(--paper);
     width:100%;
     aspect-ratio:var(--fw) / var(--fh);
-    max-width:calc(100vh * var(--fw) / var(--fh));
-    max-width:calc(100dvh * var(--fw) / var(--fh));
+    /* Never wider than the artboard itself. Figma's scale-down-width
+       only ever scales down, so a container even slightly wider leaves
+       a strip the prototype does not paint — and Figma's own
+       presentation background shows through it. Cap here and any spare
+       space belongs to the shell, in a colour we chose. */
+    max-width:min(calc(var(--fw) * 1px),
+                  calc(100vh * var(--fw) / var(--fh)));
+    max-width:min(calc(var(--fw) * 1px),
+                  calc(100dvh * var(--fw) / var(--fh)));
   }
 
   #proto{
@@ -201,12 +209,18 @@ const CONFIG = {
   FRAME_W: 402,
   FRAME_H: 874,
 
-  // 5. Fit. "scale-down-width" fills the width. Because the box above
+  // 5. Colour of the band around the frame, where the phone's shape does
+  //    not match the artboard's. Set Figma's presentation background to
+  //    the same value (Prototype tab, nothing selected → Background) and
+  //    the seam disappears. "#0B0B0C" instead reads as device bezel.
+  SURROUND: "#F4F6FA",
+
+  // 6. Fit. "scale-down-width" fills the width. Because the box above
   //    already matches the frame, this now renders the whole screen.
   SCALING: "scale-down-width",
   CONTENT_SCALING: "fixed",
 
-  // 6. Chiba button height above the bottom, in PROTOTYPE pixels — it
+  // 7. Chiba button height above the bottom, in PROTOTYPE pixels — it
   //    scales with the frame, so it keeps clearing the tab bar at any
   //    window size. Your tab bar is roughly 83px tall.
   FAB_BOTTOM: 104,
@@ -215,22 +229,22 @@ const CONFIG = {
   // Needs a one-time Figma setup, see the README. Leave CLIENT_ID empty
   // to skip all of it — the floating button works on its own.
 
-  // 6. Client id of your Figma OAuth app, with https://yhmcat9.github.io
+  // 8. Client id of your Figma OAuth app, with https://yhmcat9.github.io
   //    registered as an allowed embed origin.
   FIGMA_CLIENT_ID: "",
 
-  // 7. Frames that mean "open Chiba". Point the prototype's AI button at
+  // 9. Frames that mean "open Chiba". Point the prototype's AI button at
   //    a dedicated frame and put its node id here. Either "123:456" or
   //    "123-456" works. Set DEBUG true to read ids off the console.
   AI_HOOK_NODE_IDS: [],
 
-  // 8. "always"   — floating button always visible
+  // 10. "always"   — floating button always visible
   //    "fallback" — hide it once the in-prototype hook proves it works,
   //                 keep it for viewers where the Embed API stays silent
   //    "off"      — no floating button at all
   FAB_MODE: "always",
 
-  // 9. Logs prototype events. Also add ?debug=1 to the URL for an
+  // 11. Logs prototype events. Also add ?debug=1 to the URL for an
   //    on-screen console on a phone.
   DEBUG: false
 };
@@ -274,6 +288,7 @@ const CONFIG = {
   "use strict";
 
   var proto  = document.getElementById("proto");
+  var frameEl = document.getElementById("frame");
   var fab    = document.getElementById("chiba");
   var panel  = document.getElementById("panel");
   var scrim  = document.getElementById("scrim");
@@ -284,6 +299,7 @@ const CONFIG = {
   var root = document.documentElement;
   root.style.setProperty("--fw", CONFIG.FRAME_W);
   root.style.setProperty("--fh", CONFIG.FRAME_H);
+  if (CONFIG.SURROUND) root.style.setProperty("--surround", CONFIG.SURROUND);
   /* Expressed as a share of frame height, so the button holds its place
      above the tab bar whether the frame renders at 402px or 340px. */
   root.style.setProperty("--fab-bottom",
@@ -346,6 +362,22 @@ const CONFIG = {
   /* ---- chat panel ---------------------------------------------- */
   var chatFrame = null;
 
+  /* The frame is a viewport, never a scroller. Anything that manages to
+     scroll it is a bug, so put it straight back. */
+  function unscroll(){
+    if (frameEl.scrollTop || frameEl.scrollLeft){
+      frameEl.scrollTop = 0;
+      frameEl.scrollLeft = 0;
+    }
+  }
+  frameEl.addEventListener("scroll", unscroll);
+
+  function focusSafely(el){
+    try { el.focus({ preventScroll: true }); }
+    catch(e){ el.focus(); }      /* very old engines ignore the option */
+    unscroll();
+  }
+
   /* Built well before anyone taps. chat.html pulls two Google font
      families, a full-bleed room image and a stack of sheet artwork; if
      that all starts at open time it competes with the slide for the main
@@ -380,7 +412,13 @@ const CONFIG = {
     document.body.classList.add("chat-open");
     panel.setAttribute("aria-hidden", "false");
     fab.classList.remove("nudge");
-    closeB.focus();
+    /* preventScroll matters here. At this instant the panel is still at
+       translateY(101%), below the frame and clipped away. A plain
+       focus() makes the browser scroll the nearest scrollable ancestor
+       to reveal the button — and overflow:hidden boxes can still be
+       scrolled programmatically, so the whole frame jumps, then snaps
+       back once the panel finishes rising. */
+    focusSafely(closeB);
     /* Replay the greeting, which would otherwise have faded during
        the preload, long before the panel was ever shown. */
     try {
@@ -392,7 +430,7 @@ const CONFIG = {
   function closeChat(){
     document.body.classList.remove("chat-open");
     panel.setAttribute("aria-hidden", "true");
-    if (!fab.hidden) fab.focus();
+    if (!fab.hidden) focusSafely(fab);
   }
 
   /* Direct handle for the chat page's own back button. Same origin, so
