@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Sprout</title>
+
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#378ADD">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sprout">
+<link rel="apple-touch-icon" href="./icon-192.png">
+
+<style>
+  /* ---------------------------------------------------------------
+     Sprout shell
+
+     The shell is deliberately almost invisible: the prototype is the
+     product, this file is only the frame that holds it.
+
+     On a phone the prototype runs edge to edge. On a desktop it sits
+     in a narrow column with a thin rounded outline, so you get the
+     device reading without a thick bezel eating the screen. Turn the
+     device frame OFF inside Figma — this replaces it.
+     --------------------------------------------------------------- */
+  :root{
+    --blue:#378ADD;
+    --coral:#E07B6C;
+    --ink:#1B3A6B;
+    --paper:#F4F6FA;
+    --fw:402;                 /* prototype frame size, set from CONFIG */
+    --fh:874;
+    --ease:cubic-bezier(.22,.8,.28,1);
+    /* Opening and closing want different motion. Rising: a slow start
+       so the panel reads as one object lifting rather than popping into
+       place. Leaving: quicker, since nobody wants to wait to dismiss. */
+    --in-dur:.62s;   --in-ease:cubic-bezier(.4,0,.2,1);
+    --out-dur:.36s;  --out-ease:cubic-bezier(.4,0,1,1);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{
+    height:100%;margin:0;padding:0;
+    background:var(--paper);
+    overscroll-behavior:none;
+    font-family:"DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    color:var(--ink);
+  }
+  body{overflow:hidden}
+
+  #stage{position:fixed;inset:0;display:grid;place-items:center}
+
+  /* The box is locked to the prototype's own proportions. Figma scales
+     to width, so a container of any other shape clips the bottom of the
+     frame — which is exactly where a pinned tab bar lives. Letterbox
+     instead of clip: a few px of background beats a missing nav bar. */
+  #frame{
+    position:relative;
+    overflow:hidden;
+    background:var(--paper);
+    width:100%;
+    aspect-ratio:var(--fw) / var(--fh);
+    max-width:calc(100vh * var(--fw) / var(--fh));
+    max-width:calc(100dvh * var(--fw) / var(--fh));
+  }
+
+  #proto{
+    position:absolute;inset:0;width:100%;height:100%;
+    border:0;display:block;background:var(--paper);
+  }
+
+  /* desktop: a phone-shaped column, thin outline, no chunky chassis */
+  @media (min-width:560px){
+    body{background:#E4EAF3}
+    #frame{
+      max-width:min(calc(var(--fw) * 1px),
+                    calc((100dvh - 56px) * var(--fw) / var(--fh)));
+      border-radius:34px;
+      border:1px solid rgba(27,58,107,.12);
+      box-shadow:0 18px 50px rgba(27,58,107,.16);
+    }
+  }
+
+  /* --- Chiba button ---------------------------------------------- */
+  #chiba{
+    position:absolute;right:4%;
+    bottom:calc(var(--fab-bottom,12%) + env(safe-area-inset-bottom,0px));
+    width:58px;height:58px;border:0;padding:0;border-radius:50%;
+    background:linear-gradient(150deg,#F0A090,var(--coral));
+    box-shadow:0 6px 18px rgba(224,123,108,.42), 0 1px 3px rgba(27,58,107,.18);
+    cursor:pointer;overflow:hidden;z-index:20;
+    display:grid;place-items:center;
+    transition:transform .18s var(--ease), opacity .25s var(--ease);
+  }
+  #chiba:active{transform:scale(.93)}
+  #chiba:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  #chiba img{width:100%;height:100%;object-fit:cover;object-position:50% 18%}
+  #chiba .fallback{font-size:24px;line-height:1}
+  #chiba[hidden]{display:none}
+
+  @keyframes nudge{
+    0%,72%,100%{box-shadow:0 6px 18px rgba(224,123,108,.42),0 1px 3px rgba(27,58,107,.18)}
+    82%{box-shadow:0 6px 18px rgba(224,123,108,.42),0 1px 3px rgba(27,58,107,.18),0 0 0 12px rgba(224,123,108,.16)}
+  }
+  #chiba.nudge{animation:nudge 2.6s var(--ease) 1.2s 2}
+  @media (prefers-reduced-motion:reduce){ #chiba.nudge{animation:none} }
+
+  /* --- chat panel ------------------------------------------------- */
+  #scrim{
+    position:absolute;inset:0;background:rgba(27,58,107,.34);
+    opacity:0;pointer-events:none;
+    transition:opacity var(--out-dur) var(--out-ease);z-index:25;
+  }
+  /* Dimming leads the motion slightly, so the sheet rises into an
+     already-settling background instead of racing it. */
+  body.chat-open #scrim{
+    opacity:1;pointer-events:auto;
+    transition:opacity calc(var(--in-dur) * .72) var(--in-ease);
+  }
+
+  #panel{
+    position:absolute;left:0;right:0;bottom:0;
+    height:calc(100% - 28px);
+    background:#fff;
+    border-radius:22px 22px 0 0;
+    box-shadow:0 -8px 40px rgba(27,58,107,.24);
+    transform:translateY(101%);
+    transition:transform var(--out-dur) var(--out-ease);
+    will-change:transform;          /* own compositor layer, so the slide
+                                       never waits on a main-thread paint */
+    z-index:30;overflow:hidden;
+    display:flex;flex-direction:column;
+  }
+  body.chat-open #panel{
+    transform:translateY(0);
+    transition:transform var(--in-dur) var(--in-ease);
+  }
+  @media (prefers-reduced-motion:reduce){ #panel,#scrim{transition:none} }
+
+  #grip{
+    flex:0 0 auto;height:26px;display:grid;place-items:center;
+    touch-action:none;cursor:grab;background:#fff;
+  }
+  #grip::before{content:"";width:38px;height:4px;border-radius:2px;background:#D3DBE8}
+  #close{
+    position:absolute;top:6px;right:8px;width:34px;height:34px;
+    border:0;border-radius:50%;background:transparent;color:#7A8CA8;
+    font-size:19px;line-height:1;cursor:pointer;z-index:2;
+  }
+  #close:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+
+  #chatWrap{flex:1 1 auto;position:relative;background:#fff}
+  #chatWrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+
+  /* --- status cards ----------------------------------------------- */
+  .card{
+    position:absolute;left:20px;right:20px;top:50%;transform:translateY(-50%);
+    background:#fff;border-radius:18px;padding:22px 20px;z-index:15;
+    box-shadow:0 8px 30px rgba(27,58,107,.14);
+    font-size:14.5px;line-height:1.6;
+  }
+  .card h1{margin:0 0 8px;font-size:17px;font-weight:700}
+  .card p{margin:0 0 10px;color:#4A6288}
+  .card ol{margin:0 0 14px;padding-left:19px;color:#4A6288}
+  .card li{margin-bottom:5px}
+  .card code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+    background:var(--paper);padding:1px 5px;border-radius:5px;color:var(--ink);
+  }
+  .card button{
+    border:0;border-radius:11px;background:var(--blue);color:#fff;
+    font:inherit;font-weight:600;padding:11px 18px;cursor:pointer;
+  }
+  .card[hidden]{display:none}
+</style>
+</head>
+<body>
+
+<!-- ===================================================================
+     CONFIG — the only part you need to edit.
+     =================================================================== -->
+<script>
+const CONFIG = {
+
+  // 1. PRESENT-mode share link.
+  //    In Figma: press Present (▶), then Share → Copy link, and set
+  //    access to "Anyone with the link".
+  //    Turn the device frame OFF: Prototype tab → Device → None.
+  FIGMA_PROTO_URL: "https://www.figma.com/proto/IFismG752aj6O96K9ysKRY/Untitled?node-id=1-933&page-id=0%3A1&starting-point-node-id=1%3A933",
+
+  // 2. The Chiba chat page. Relative path keeps it same-origin.
+  CHAT_URL: "./chat.html",
+
+  // 3. Chiba's face on the button. Empty string falls back to a leaf.
+  CHIBA_AVATAR: "./images/千叶_neutral.png",
+
+  // 4. Your Figma frame size. The shell locks its box to these
+  //    proportions so nothing gets clipped — get this wrong and the
+  //    bottom of every screen disappears.
+  FRAME_W: 402,
+  FRAME_H: 874,
+
+  // 5. Fit. "scale-down-width" fills the width. Because the box above
+  //    already matches the frame, this now renders the whole screen.
+  SCALING: "scale-down-width",
+  CONTENT_SCALING: "fixed",
+
+  // 6. Chiba button height above the bottom, in PROTOTYPE pixels — it
+  //    scales with the frame, so it keeps clearing the tab bar at any
+  //    window size. Your tab bar is roughly 83px tall.
+  FAB_BOTTOM: 104,
+
+  // ---- Opening Chiba from a button INSIDE the prototype ------------
+  // Needs a one-time Figma setup, see the README. Leave CLIENT_ID empty
+  // to skip all of it — the floating button works on its own.
+
+  // 6. Client id of your Figma OAuth app, with https://yhmcat9.github.io
+  //    registered as an allowed embed origin.
+  FIGMA_CLIENT_ID: "",
+
+  // 7. Frames that mean "open Chiba". Point the prototype's AI button at
+  //    a dedicated frame and put its node id here. Either "123:456" or
+  //    "123-456" works. Set DEBUG true to read ids off the console.
+  AI_HOOK_NODE_IDS: [],
+
+  // 8. "always"   — floating button always visible
+  //    "fallback" — hide it once the in-prototype hook proves it works,
+  //                 keep it for viewers where the Embed API stays silent
+  //    "off"      — no floating button at all
+  FAB_MODE: "always",
+
+  // 9. Logs prototype events. Also add ?debug=1 to the URL for an
+  //    on-screen console on a phone.
+  DEBUG: false
+};
+</script>
+
+<div id="stage">
+  <div id="frame">
+    <iframe id="proto" title="Sprout prototype" allow="fullscreen" allowfullscreen></iframe>
+
+    <button id="chiba" class="nudge" aria-label="Open Chiba" hidden></button>
+
+    <div id="scrim"></div>
+
+    <section id="panel" role="dialog" aria-modal="true" aria-label="Chiba" aria-hidden="true">
+      <div id="grip"></div>
+      <button id="close" aria-label="Close Chiba">✕</button>
+      <div id="chatWrap"></div>
+    </section>
+
+    <div class="card" id="setup" hidden>
+      <h1>Add the prototype link</h1>
+      <p><code>FIGMA_PROTO_URL</code> still points at the Figma editor rather than a prototype.</p>
+      <ol>
+        <li>Open the file and press Present.</li>
+        <li>Share → Copy link, access set to <em>Anyone with the link</em>.</li>
+        <li>Paste it into <code>CONFIG.FIGMA_PROTO_URL</code>.</li>
+      </ol>
+      <button onclick="document.getElementById('setup').hidden=true">Continue anyway</button>
+    </div>
+
+    <div class="card" id="offline" hidden>
+      <h1>No connection</h1>
+      <p>The prototype streams from Figma, so it needs network. Chiba does too.</p>
+      <button onclick="location.reload()">Try again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var proto  = document.getElementById("proto");
+  var fab    = document.getElementById("chiba");
+  var panel  = document.getElementById("panel");
+  var scrim  = document.getElementById("scrim");
+  var wrap   = document.getElementById("chatWrap");
+  var closeB = document.getElementById("close");
+  var grip   = document.getElementById("grip");
+
+  var root = document.documentElement;
+  root.style.setProperty("--fw", CONFIG.FRAME_W);
+  root.style.setProperty("--fh", CONFIG.FRAME_H);
+  /* Expressed as a share of frame height, so the button holds its place
+     above the tab bar whether the frame renders at 402px or 340px. */
+  root.style.setProperty("--fab-bottom",
+    (CONFIG.FAB_BOTTOM / CONFIG.FRAME_H * 100).toFixed(2) + "%");
+
+  var params = new URLSearchParams(location.search);
+  var DEBUG  = CONFIG.DEBUG || params.get("debug") === "1";
+
+  /* On-screen console for phone testing, where DevTools is out of reach. */
+  if (params.get("debug") === "1"){
+    var s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/eruda";
+    s.onload = function(){ window.eruda && window.eruda.init(); };
+    document.head.appendChild(s);
+  }
+
+  function log(){ if (DEBUG) console.log.apply(console, arguments); }
+
+  /* ---- build the embed URL ------------------------------------- */
+  function toEmbedUrl(raw){
+    var u = new URL(raw, location.href);
+    u.protocol = "https:";
+    u.hostname = "embed.figma.com";
+    u.pathname = u.pathname.replace(/^\/(design|file)\//, "/proto/");
+    var p = u.searchParams;
+    p.set("embed-host", "sprout-shell");
+    p.set("kind", "proto");
+    p.set("hide-ui", "1");
+    p.set("hotspot-hints", "0");
+    p.set("footer", "false");
+    p.set("scaling", CONFIG.SCALING);
+    p.set("content-scaling", CONFIG.CONTENT_SCALING);
+    p.set("disable-default-keyboard-nav", "1");
+    if (CONFIG.FIGMA_CLIENT_ID) p.set("client-id", CONFIG.FIGMA_CLIENT_ID);
+    p.delete("t");
+    return u.toString();
+  }
+
+  if (/\/(design|file)\//.test(CONFIG.FIGMA_PROTO_URL) &&
+      !/starting-point-node-id/.test(CONFIG.FIGMA_PROTO_URL)){
+    document.getElementById("setup").hidden = false;
+  }
+
+  proto.src = toEmbedUrl(CONFIG.FIGMA_PROTO_URL);
+
+  /* ---- Chiba button -------------------------------------------- */
+  if (CONFIG.FAB_MODE !== "off"){
+    if (CONFIG.CHIBA_AVATAR){
+      var img = new Image();
+      img.alt = "";
+      img.onload  = function(){ fab.appendChild(img); fab.hidden = false; };
+      img.onerror = function(){ fab.innerHTML = '<span class="fallback">🌱</span>'; fab.hidden = false; };
+      img.src = CONFIG.CHIBA_AVATAR;
+    } else {
+      fab.innerHTML = '<span class="fallback">🌱</span>';
+      fab.hidden = false;
+    }
+  }
+
+  /* ---- chat panel ---------------------------------------------- */
+  var chatFrame = null;
+
+  /* Built well before anyone taps. chat.html pulls two Google font
+     families, a full-bleed room image and a stack of sheet artwork; if
+     that all starts at open time it competes with the slide for the main
+     thread, and the panel appears to jump into place instead of rising. */
+  function ensureChatFrame(){
+    if (chatFrame) return chatFrame;
+    chatFrame = document.createElement("iframe");
+    chatFrame.title = "Chiba";
+    chatFrame.setAttribute("allow", "microphone; clipboard-write");
+    chatFrame.src = CONFIG.CHAT_URL;
+    wrap.appendChild(chatFrame);
+    return chatFrame;
+  }
+
+  function preloadChat(){
+    if ("requestIdleCallback" in window){
+      requestIdleCallback(ensureChatFrame, { timeout: 2500 });
+    } else {
+      setTimeout(ensureChatFrame, 600);
+    }
+  }
+  /* Wait for the prototype first — it is the heavier load and the one
+     the person is actually looking at. */
+  proto.addEventListener("load", preloadChat);
+  setTimeout(preloadChat, 4000);        /* in case that load never fires */
+
+  function openChat(){
+    if (document.body.classList.contains("chat-open")) return;
+    ensureChatFrame();
+    /* The iframe is never removed, so the conversation survives
+       closing and reopening the panel. */
+    document.body.classList.add("chat-open");
+    panel.setAttribute("aria-hidden", "false");
+    fab.classList.remove("nudge");
+    closeB.focus();
+    /* Replay the greeting, which would otherwise have faded during
+       the preload, long before the panel was ever shown. */
+    try {
+      var w = chatFrame.contentWindow;
+      if (w && typeof w.sproutOnShow === "function") w.sproutOnShow();
+    } catch(e){}
+  }
+
+  function closeChat(){
+    document.body.classList.remove("chat-open");
+    panel.setAttribute("aria-hidden", "true");
+    if (!fab.hidden) fab.focus();
+  }
+
+  /* Direct handle for the chat page's own back button. Same origin, so
+     this is a plain function call — far more reliable than messaging. */
+  window.SproutShell = { open: openChat, close: closeChat };
+
+  fab.addEventListener("click", openChat);
+  closeB.addEventListener("click", closeChat);
+  scrim.addEventListener("click", closeChat);
+  document.addEventListener("keydown", function(e){
+    if (e.key === "Escape" && document.body.classList.contains("chat-open")) closeChat();
+  });
+
+  (function(){                                   /* swipe down to dismiss */
+    var y0 = null;
+    grip.addEventListener("pointerdown", function(e){
+      y0 = e.clientY; grip.setPointerCapture(e.pointerId);
+      panel.style.transition = "none";
+    });
+    grip.addEventListener("pointermove", function(e){
+      if (y0 === null) return;
+      panel.style.transform = "translateY(" + Math.max(0, e.clientY - y0) + "px)";
+    });
+    grip.addEventListener("pointerup", function(e){
+      if (y0 === null) return;
+      var dy = Math.max(0, e.clientY - y0);
+      panel.style.transition = ""; panel.style.transform = "";
+      if (dy > 90) closeChat();
+      y0 = null;
+    });
+  })();
+
+  /* ---- offline notice ------------------------------------------ */
+  function checkNet(){ document.getElementById("offline").hidden = navigator.onLine; }
+  window.addEventListener("online", checkNet);
+  window.addEventListener("offline", checkNet);
+  checkNet();
+
+  /* ---- talking to the prototype --------------------------------
+     Figma's Embed API only speaks to a logged-in Figma session, and
+     only from an origin registered on your OAuth app. So this drives
+     the nicer entry point where it is available, and the floating
+     button covers every case where it is not. */
+
+  var figmaOrigin = "https://www.figma.com";   /* replaced on the first real event */
+
+  var hooks = (CONFIG.AI_HOOK_NODE_IDS || []).map(function(id){
+    return String(id).replace(/-/g, ":");      /* URLs use 12-34, events use 12:34 */
+  });
+
+  function tellFigma(type){
+    try { proto.contentWindow.postMessage({ type: type }, figmaOrigin); } catch(e){}
+  }
+
+  window.addEventListener("message", function(e){
+    /* The chat page asking to be dismissed — same origin, so trust it. */
+    if (e.origin === location.origin && e.data && e.data.sprout === "close-chat"){
+      closeChat();
+      return;
+    }
+
+    var host;
+    try { host = new URL(e.origin).hostname; } catch(err){ return; }
+    if (!/(^|\.)figma\.com$/.test(host)) return;
+    figmaOrigin = e.origin;
+
+    var d = e.data || {};
+    if (!d.type) return;
+
+    if (d.type === "INITIAL_LOAD"){
+      log("[figma] prototype loaded");
+      /* The API answered, so the in-prototype entry works on this device. */
+      if (CONFIG.FAB_MODE === "fallback" && hooks.length && !fab.hidden){
+        fab.style.opacity = "0";
+        setTimeout(function(){ fab.hidden = true; }, 260);
+      }
+      return;
+    }
+
+    if (d.type === "PRESENTED_NODE_CHANGED"){
+      var id = d.data && d.data.presentedNodeId;
+      log("[figma] node", id);
+      if (id && hooks.indexOf(id) !== -1){
+        openChat();
+        /* Step the prototype off the hook frame while the panel covers
+           it, so closing Chiba lands you back where you were. */
+        setTimeout(function(){ tellFigma("NAVIGATE_BACKWARD"); }, 180);
+      }
+    }
+  });
+
+  /* ---- service worker ------------------------------------------ */
+  if ("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("./sw.js").catch(function(){});
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -208,7 +208,7 @@
             padding: 0 14px;
             gap: 10px;
             border-top: 1px solid rgba(55,138,221,0.12);
-            z-index: 5;
+            z-index: 50;
             position: absolute;
             bottom: 0; left: 0; right: 0;
             margin: 8px;
@@ -313,6 +313,7 @@
         .menu-fan.open .menu-row:nth-child(3) { transition-delay: 0.11s; }
         .menu-fan.open .menu-row:nth-child(4) { transition-delay: 0.15s; }
         .menu-fan.open .menu-row:nth-child(5) { transition-delay: 0.19s; }
+        .menu-fan.open .menu-row:nth-child(6) { transition-delay: 0.23s; }
 
         .menu-label {
             background: rgba(255,255,255,0.92);
@@ -469,7 +470,259 @@
         .history-item.user .history-bubble { background: var(--primary); color: #fff; border-bottom-right-radius: 5px; }
         .history-item.assistant .history-bubble { background: var(--surface-2); color: var(--ink); border-bottom-left-radius: 5px; }
         .history-empty { color: #9aa3b0; text-align: center; margin-top: 36px; font-size: 14px; }
+
+        /* ============ Thinking state (waiting for Dify) ============ */
+        .character-container.thinking { animation: thinkSway 2.4s ease-in-out infinite; }
+        @keyframes thinkSway {
+            0%, 100% { transform: translateX(-50%) rotate(0deg); }
+            50%      { transform: translateX(-50%) rotate(1.6deg); }
+        }
+        .typing-dots { display: inline-flex; align-items: center; gap: 5px; padding: 3px 0; vertical-align: middle; }
+        .typing-dots i {
+            width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+            display: inline-block; animation: dotPulse 1.2s ease-in-out infinite;
+        }
+        .typing-dots i:nth-child(2) { animation-delay: 0.16s; }
+        .typing-dots i:nth-child(3) { animation-delay: 0.32s; }
+        @keyframes dotPulse {
+            0%, 100% { transform: translateY(0); opacity: 0.35; }
+            50%      { transform: translateY(-4px); opacity: 1; }
+        }
+
+        /* ============ Story chapter list (inside Story sheet) ============ */
+        .story-list { display: flex; flex-direction: column; gap: 11px; margin-top: 4px; }
+        .story-card {
+            display: flex; align-items: center; gap: 12px;
+            background: var(--surface-2); border-radius: 18px; padding: 11px;
+            border: 1px solid rgba(0,0,0,0.04);
+            cursor: pointer; transition: transform 0.15s, box-shadow 0.2s;
+        }
+        .story-card:not(.locked):active { transform: scale(0.98); }
+        .story-card.locked { cursor: default; }
+        .story-thumb {
+            width: 56px; height: 56px; border-radius: 14px; flex: 0 0 auto;
+            background-size: cover; background-position: center;
+            display: flex; align-items: center; justify-content: center; color: #fff;
+        }
+        .story-thumb svg { width: 22px; height: 22px; }
+        .story-info { flex: 1; min-width: 0; }
+        .story-name { font-family: var(--font-display); font-size: 14.5px; font-weight: 700; color: var(--ink); }
+        .story-card.locked .story-name { color: var(--ink-soft); }
+        .story-teaser {
+            font-size: 12px; color: var(--ink-soft); line-height: 1.4; margin-top: 2px;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .story-go { flex: 0 0 auto; color: var(--accent); display: flex; }
+        .story-go svg { width: 20px; height: 20px; }
+
+        /* ============ Visual-novel player (fullscreen over the phone) ============ */
+        .vn-stage {
+            position: absolute; inset: 8px; border-radius: 36px;
+            background: #16181f; overflow: hidden;
+            z-index: 200; display: none; opacity: 0; transition: opacity 0.35s ease;
+        }
+        .vn-stage.active { display: block; opacity: 1; }
+        .vn-stage.shake { animation: vnShake 0.5s ease; }
+        @keyframes vnShake {
+            0%,100% { transform: translate(0,0); }
+            20% { transform: translate(-5px,3px); } 40% { transform: translate(5px,-3px); }
+            60% { transform: translate(-4px,-2px); } 80% { transform: translate(4px,2px); }
+        }
+        .vn-bg {
+            position: absolute; inset: 0; background-size: cover; background-position: center;
+            transition: opacity 0.5s ease;
+        }
+        .vn-bg::after {
+            content: ""; position: absolute; inset: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0) 32%, rgba(0,0,0,0.55) 100%);
+        }
+        .vn-sprite {
+            position: absolute; bottom: 118px; left: 50%; transform: translateX(-50%);
+            max-height: 60%; max-width: 90%; object-fit: contain; z-index: 1;
+            filter: drop-shadow(0 8px 22px rgba(0,0,0,0.4));
+            transition: opacity 0.3s ease;
+        }
+        .vn-cg {
+            position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+            z-index: 2; opacity: 0; pointer-events: none; transition: opacity 0.45s ease;
+        }
+        .vn-cg.show { opacity: 1; }
+        .vn-top {
+            position: absolute; top: 14px; left: 14px; right: 14px; z-index: 6;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .vn-chapter-title {
+            background: rgba(20,22,30,0.55); color: #fff; backdrop-filter: blur(8px);
+            font-family: var(--font-display); font-weight: 600; font-size: 12px;
+            padding: 5px 12px; border-radius: 999px; max-width: 70%;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .vn-close {
+            width: 32px; height: 32px; border-radius: 50%; flex: 0 0 auto;
+            background: rgba(20,22,30,0.55); color: #fff; backdrop-filter: blur(8px);
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        }
+        .vn-close svg { width: 16px; height: 16px; }
+        .vn-box {
+            position: absolute; left: 14px; right: 14px; bottom: 16px; z-index: 5;
+            background: rgba(18, 20, 28, 0.82); backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.12); border-radius: 20px;
+            padding: 13px 16px 30px; color: #fff; min-height: 92px;
+        }
+        .vn-who {
+            font-family: var(--font-display); font-weight: 700; font-size: 14px;
+            color: var(--accent); margin-bottom: 5px; display: inline-block;
+        }
+        .vn-who.you { color: #7fb2e6; }
+        .vn-text { font-size: 14.5px; line-height: 1.5; min-height: 44px; white-space: pre-wrap; }
+        .vn-next {
+            position: absolute; right: 15px; bottom: 10px; color: rgba(255,255,255,0.65);
+            font-size: 11px; display: none; align-items: center; gap: 4px; animation: vnBlink 1.4s ease-in-out infinite;
+        }
+        .vn-next svg { width: 13px; height: 13px; }
+        @keyframes vnBlink { 0%,100% { opacity: 0.35; } 50% { opacity: 0.95; } }
+        .vn-flash { position: absolute; inset: 0; background: #fff; z-index: 8; opacity: 0; pointer-events: none; }
+        .vn-flash.fire { animation: vnFlash 0.55s ease; }
+        @keyframes vnFlash { 0% { opacity: 0; } 22% { opacity: 0.85; } 100% { opacity: 0; } }
+        .vn-end {
+            position: absolute; inset: 0; z-index: 10; display: none;
+            flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+            background: rgba(16,18,24,0.92); backdrop-filter: blur(6px); color: #fff; text-align: center; padding: 0 30px;
+        }
+        .vn-end.show { display: flex; }
+        .vn-end-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+        .vn-end-sub { font-size: 13px; color: rgba(255,255,255,0.72); line-height: 1.5; }
+        .vn-end button {
+            margin-top: 8px; background: var(--accent); color: #fff; border: none;
+            font-family: var(--font-display); font-weight: 600; font-size: 14px;
+            padding: 11px 26px; border-radius: 14px; cursor: pointer;
+        }
+
+        /* ============ Outfits grid state (Decorate) ============ */
+        .shop-card.locked { opacity: 0.62; }
+        .shop-card.outfit .shop-thumb { display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
+        .shop-card.outfit .shop-thumb img { width: 78%; object-fit: contain; object-position: bottom; }
+        .decorate-seg div { cursor: pointer; }
+
+        /* ============ Plain-assistant mode ============ */
+        .assistant-panel {
+            position: absolute; inset: 0; z-index: 40; background: var(--surface-2);
+            display: none; flex-direction: column;
+        }
+        .assistant-panel.active { display: flex; }
+        .assistant-head {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 14px 12px; background: var(--surface);
+            border-bottom: 1px solid rgba(0,0,0,0.06); flex: 0 0 auto;
+        }
+        .assistant-head .a-back {
+            width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2);
+            display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink); flex: 0 0 auto;
+        }
+        .assistant-head .a-back svg { width: 18px; height: 18px; }
+        .assistant-head .a-av {
+            width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: top; background: #dfe5ee; flex: 0 0 auto;
+        }
+        .assistant-head .a-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; line-height: 1.2; }
+        .assistant-head .a-sub { font-size: 11px; color: var(--ink-soft); }
+        .assistant-thread {
+            flex: 1; overflow-y: auto; padding: 16px 14px 84px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .a-msg { display: flex; max-width: 86%; }
+        .a-msg.user { align-self: flex-end; }
+        .a-msg.bot { align-self: flex-start; }
+        .a-bubble { padding: 10px 13px; border-radius: 16px; font-size: 13.5px; line-height: 1.5; word-break: break-word; }
+        .a-msg.user .a-bubble { background: var(--primary); color: #fff; border-bottom-right-radius: 5px; }
+        .a-msg.bot .a-bubble { background: var(--surface); color: var(--ink); border-bottom-left-radius: 5px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .a-empty { margin: auto; text-align: center; color: #9aa3b0; font-size: 13px; line-height: 1.6; padding: 30px 20px; }
+
+        /* ============ Embedded mode ============
+           When this page runs inside the Sprout shell it is already on a
+           phone, so the phone chrome comes off: no bezel, no rounded
+           corners, no shadow, no fixed 337x675 box. Open chat.html on its
+           own and the frame is still there, unchanged. */
+        html.embedded, html.embedded body { height: 100%; }
+        html.embedded body {
+            min-height: 0;
+            display: block;
+            background: #e9e2d4;
+        }
+        html.embedded .phone {
+            width: 100%;
+            height: 100%;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 0;
+            background: #e9e2d4;   /* scene base colour, so no black flash while art loads */
+        }
+        html.embedded .scene { border-radius: 0; }
+        html.embedded .vn-stage { inset: 0; border-radius: 0; }
     </style>
+
+    <script>
+    /* Decide embedded vs standalone before first paint, so the frame
+       never flashes on screen and then vanishes.
+         in an iframe          -> embedded
+         ?embed=1              -> force embedded
+         ?embed=0              -> force the phone frame back */
+    (function(){
+        var q = new URLSearchParams(location.search);
+        var forced = q.get("embed");
+        var embedded = forced === "0" ? false
+                     : (forced === "1" || window.self !== window.top);
+        if (!embedded) return;
+
+        document.documentElement.classList.add("embedded");
+
+        /* Ask the shell to close. Three routes, because a dead back
+           button that fails silently is the worst of both worlds:
+             1. direct call — same origin, so this just works
+             2. postMessage — if the shell predates the direct API
+             3. a console error — so it can never fail quietly again */
+        function closeShell(){
+            try {
+                if (parent && parent.SproutShell && parent.SproutShell.close){
+                    parent.SproutShell.close();
+                    return;
+                }
+            } catch(e){}
+            try {
+                parent.postMessage({ sprout: "close-chat" }, location.origin);
+                return;
+            } catch(e){
+                console.error("[sprout] could not reach the shell to close:", e);
+            }
+        }
+
+        /* Delegated and in the capture phase, so it survives any DOM the
+           page rebuilds later and cannot be swallowed by another handler. */
+        document.addEventListener("click", function(ev){
+            var back = ev.target.closest && ev.target.closest('.topbar .icon-btn[title="Back"]');
+            if (!back) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            closeShell();
+        }, true);
+
+        document.addEventListener("DOMContentLoaded", function(){
+            var back = document.querySelector('.topbar .icon-btn[title="Back"]');
+            if (back) back.style.cursor = "pointer";
+        });
+
+        /* The shell preloads this page long before the panel opens, so the
+           greeting would have faded by the time anyone sees it. The shell
+           calls this on open to replay it. */
+        window.sproutOnShow = function(){
+            var b = document.getElementById("dialogueBubble");
+            if (!b) return;
+            b.style.animation = "none";
+            void b.offsetWidth;          /* force reflow so the restart takes */
+            b.style.animation = "";
+        };
+    })();
+    </script>
 </head>
 <body>
 
@@ -511,10 +764,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l-1 12H7L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
                 </div>
             </div>
-            <div class="menu-row" data-sheet="map">
-                <span class="menu-label">Map</span>
+            <div class="menu-row" data-sheet="story">
+                <span class="menu-label">Story</span>
                 <div class="menu-tile" style="background:var(--tile-green);color:var(--tile-green-ink)">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h5v16H6a2 2 0 0 0-2 2V5z"/><path d="M20 5a2 2 0 0 0-2-2h-5v16h5a2 2 0 0 1 2 2V5z"/></svg>
                 </div>
             </div>
             <div class="menu-row" data-sheet="tasks">
@@ -527,6 +780,12 @@
                 <span class="menu-label">History</span>
                 <div class="menu-tile" style="background:var(--tile-purple);color:var(--tile-purple-ink)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 9a9 9 0 1 1-1 6"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>
+                </div>
+            </div>
+            <div class="menu-row" data-action="assistant">
+                <span class="menu-label">Plain chat</span>
+                <div class="menu-tile" style="background:#e7ebf1;color:#3a4657">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>
                 </div>
             </div>
         </div>
@@ -597,39 +856,30 @@
                         <span class="label-sm">Shop · spend Health Rice</span>
                         <span class="balance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h6"/></svg> 1,240</span>
                     </div>
-                    <div class="seg"><div class="on">Backgrounds</div><div>Outfits</div></div>
-                    <div class="grid2">
+                    <div class="seg decorate-seg"><div class="on">Backgrounds</div><div>Outfits</div></div>
+                    <div class="grid2" id="bgGrid">
                         <div class="shop-card"><div class="shop-thumb" style="background-image:url('images/bedroom1.png')"></div><div class="shop-meta"><div class="shop-name">Cozy bedroom</div><div class="shop-foot"><span class="pill pill-done">Equipped</span></div></div></div>
                         <div class="shop-card"><div class="shop-thumb" style="background:linear-gradient(135deg,#cfe3f7,#e9e2d4)"></div><div class="shop-meta"><div class="shop-name">Library</div><div class="shop-foot"><span class="price"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h6"/></svg>250</span></div></div></div>
                         <div class="shop-card"><div class="shop-thumb" style="background:linear-gradient(135deg,#cfeec9,#dcebfa)"></div><div class="shop-meta"><div class="shop-name">Spring park</div><div class="shop-foot"><span class="price"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h6"/></svg>180</span></div></div></div>
                         <div class="shop-card"><div class="shop-thumb" style="background:linear-gradient(135deg,#e7edf5,#f2eee6)"></div><div class="shop-meta"><div class="shop-name">Clinic</div><div class="shop-foot"><span class="pill pill-lock">Lv.10</span></div></div></div>
                     </div>
-                    <p class="sheet-note">Buy backgrounds and character outfits with Health Rice earned from tasks and the community. The “Outfits” tab swaps Chiba's clothing.</p>
+                    <div class="grid2" id="outfitGrid" style="display:none;">
+                        <div class="shop-card outfit"><div class="shop-thumb" style="background:linear-gradient(135deg,#f6ede1,#efe2d0)"><img src="images/千叶_neutral.png" alt="Everyday" onerror="this.style.display='none'"></div><div class="shop-meta"><div class="shop-name">Everyday</div><div class="shop-foot"><span class="pill pill-done">Equipped</span></div></div></div>
+                        <div class="shop-card outfit"><div class="shop-thumb" style="background:linear-gradient(135deg,#e6f0e2,#d6e8d0)"><img src="images/千叶_happy.png" alt="Cozy knit" onerror="this.style.display='none'"></div><div class="shop-meta"><div class="shop-name">Cozy knit</div><div class="shop-foot"><span class="price"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h6"/></svg>200</span></div></div></div>
+                        <div class="shop-card outfit"><div class="shop-thumb" style="background:linear-gradient(135deg,#e7edf5,#dbe6f4)"><img src="images/千叶_neutral.png" alt="Lab coat" onerror="this.style.display='none'"></div><div class="shop-meta"><div class="shop-name">Lab coat</div><div class="shop-foot"><span class="price"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h6M9 14h6"/></svg>320</span></div></div></div>
+                        <div class="shop-card outfit locked"><div class="shop-thumb" style="background:linear-gradient(135deg,#efe9f6,#e2daf2)"><img src="images/千叶_happy.png" alt="Winter set" onerror="this.style.display='none'"></div><div class="shop-meta"><div class="shop-name">Winter set</div><div class="shop-foot"><span class="pill pill-lock">Lv.12</span></div></div></div>
+                    </div>
+                    <p class="sheet-note">Buy backgrounds and character outfits with Health Rice earned from tasks and the community. Outfit swapping is coming soon — this is a preview of the wardrobe.</p>
                 </div>
             </div>
 
-            <!-- Map (story + travel-collect) -->
-            <div class="sheet" data-sheet="map">
+            <!-- Story (galgame chapters, unlocked by affinity) -->
+            <div class="sheet" data-sheet="story">
                 <div class="sheet-grab"></div>
-                <div class="sheet-header"><span class="sheet-title">Chiba's map</span><span class="sheet-close" data-close>✕</span></div>
+                <div class="sheet-header"><span class="sheet-title">Story</span><span class="sheet-close" data-close>✕</span></div>
                 <div class="sheet-body">
-                    <div style="height:96px;border-radius:16px;background:linear-gradient(135deg,#dcebfa,#cfeec9);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:600;color:#27500A;">Story map illustration</div>
-
-                    <div class="section-h">Story journey</div>
-                    <div class="timeline">
-                        <div class="tl-item"><div class="tl-rail"><div class="tl-dot done"></div><div class="tl-line"></div></div><div class="tl-body"><div class="tl-title">First check-up jitters</div><div class="tl-sub">Chapter cleared</div></div><span class="pill pill-done">Done</span></div>
-                        <div class="tl-item"><div class="tl-rail"><div class="tl-dot done"></div><div class="tl-line"></div></div><div class="tl-body"><div class="tl-title">Meeting the community</div><div class="tl-sub">Chapter cleared</div></div><span class="pill pill-done">Done</span></div>
-                        <div class="tl-item"><div class="tl-rail"><div class="tl-dot now"></div><div class="tl-line"></div></div><div class="tl-body"><div class="tl-title">Facing the report</div><div class="tl-sub">In progress</div></div><span class="pill pill-now">Now</span></div>
-                        <div class="tl-item"><div class="tl-rail"><div class="tl-dot"></div><div class="tl-line"></div></div><div class="tl-body"><div class="tl-title">Annual check-up quest</div><div class="tl-sub">Locked</div></div><span class="pill pill-next">Next</span></div>
-                        <div class="tl-item"><div class="tl-rail"><div class="tl-dot"></div></div><div class="tl-body"><div class="tl-title">Healthy-habit streak</div><div class="tl-sub">Locked</div></div><span class="pill pill-lock">🔒</span></div>
-                    </div>
-
-                    <div class="section-h">Souvenir album</div>
-                    <div class="album">
-                        <div class="got">🍵</div><div class="got">🩺</div><div class="got">🏷️</div><div>?</div>
-                        <div>?</div><div>?</div><div>?</div><div>?</div>
-                    </div>
-                    <p class="sheet-note">While you're away, Chiba “travels” on health errands and brings back souvenirs (Travel-Frog style). Collecting them advances the story.</p>
+                    <p class="sheet-note" style="margin-top:0;margin-bottom:12px;">A glimpse into your daily life with Chiba.</p>
+                    <div class="story-list" id="storyList"></div>
                 </div>
             </div>
 
@@ -661,6 +911,21 @@
             </div>
 
         </div>
+
+        <!-- Plain-assistant mode: a traditional chat thread over the scene -->
+        <div class="assistant-panel" id="assistantPanel">
+            <div class="assistant-head">
+                <div class="a-back" id="assistantBack" title="Back to companion" aria-label="Back to companion">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                </div>
+                <img class="a-av" src="images/千叶_neutral.png" alt="Chiba" onerror="this.style.visibility='hidden'">
+                <div>
+                    <div class="a-name">Chiba</div>
+                    <div class="a-sub">Assistant mode · straight answers</div>
+                </div>
+            </div>
+            <div class="assistant-thread" id="assistantThread"></div>
+        </div>
     </div>
 
     <!-- Input -->
@@ -669,6 +934,30 @@
         <button onclick="sendMessage()" aria-label="Send">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
         </button>
+    </div>
+
+    <!-- Visual-novel player (fullscreen story mode) -->
+    <div class="vn-stage" id="vnStage">
+        <div class="vn-bg" id="vnBg"></div>
+        <img class="vn-sprite" id="vnSprite" alt="" onerror="this.style.opacity='0'">
+        <img class="vn-cg" id="vnCg" alt="">
+        <div class="vn-flash" id="vnFlash"></div>
+        <div class="vn-top">
+            <div class="vn-chapter-title" id="vnChapterTitle">Chapter</div>
+            <div class="vn-close" id="vnClose" title="Exit" aria-label="Exit story">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </div>
+        </div>
+        <div class="vn-box" id="vnBox">
+            <span class="vn-who" id="vnWho">Chiba</span>
+            <div class="vn-text" id="vnText"></div>
+            <span class="vn-next" id="vnNext">tap<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+        </div>
+        <div class="vn-end" id="vnEnd">
+            <div class="vn-end-title">Chapter complete</div>
+            <div class="vn-end-sub" id="vnEndSub">Your bond with Chiba grows a little stronger.</div>
+            <button id="vnEndBtn">Back to stories</button>
+        </div>
     </div>
 </div>
 
@@ -694,6 +983,71 @@
         { text: "Wha—?! You startled me, popping up like that!", emotion: 'surprised' },
         { text: "I spent the whole day in the library, my head's full of medical terms… tell me something fun, please!", emotion: 'neutral' },
         { text: "(secretly snacking) Ah — busted! Keep it a secret, don't tell my mentor I'm here~", emotion: 'happy' }
+    ];
+
+    /* ============================================================
+       STORY CONTENT  —  this whole block is pure data.
+       A planner/writer can add chapters & lines here without touching
+       any engine code below. Each line supports these optional fields:
+         speaker : 'Chiba' (default) or 'You'
+         text    : the dialogue shown in the box
+         emotion : happy | sad | surprised | angry | professional | neutral  (picks the sprite)
+         bg      : a key from STORY_BG (only needed when the scene changes)
+         cg      : a key from STORY_CG (shows a full illustration; missing files are skipped)
+         effect  : 'shake' | 'flash'  (a one-off screen effect)
+       Missing art degrades gracefully to a colour gradient, so you can
+       write and test scripts before the illustrations exist.
+       ============================================================ */
+    const STORY_BG = {
+        clinic:  { image: 'bg_clinic.png',  fallback: 'linear-gradient(160deg,#dbe9f7 0%,#eef4fa 100%)' },
+        park:    { image: 'bg_park.png',    fallback: 'linear-gradient(160deg,#d7ecd0 0%,#eef7e9 100%)' },
+        bedroom: { image: 'bedroom1.png',   fallback: 'linear-gradient(160deg,#efe7d6 0%,#f6f0e4 100%)' },
+        library: { image: 'bg_library.png', fallback: 'linear-gradient(160deg,#e6ded0 0%,#f3ede2 100%)' }
+    };
+    const STORY_CG = {
+        reassurance: 'cg_reassurance.png'   /* filename in /images; absent files are ignored */
+    };
+    const STORY_DATA = [
+        {
+            id: 'ch1', title: 'First check-up jitters', thumb: 'clinic', unlocked: true,
+            teaser: 'Chiba stays by your side through your very first full health screening.',
+            lines: [
+                { bg: 'clinic', emotion: 'neutral',   text: "So… today's the day. Your first full check-up." },
+                { emotion: 'sad',                      text: "I can tell you're nervous — your hands have been fidgeting since we sat down." },
+                { speaker: 'You',                      text: "...Is it that obvious?" },
+                { emotion: 'happy',                    text: "A little! But being nervous just means you care about yourself. That's a good start." },
+                { emotion: 'surprised', effect: 'flash', text: "Oh! They just called your number." },
+                { emotion: 'neutral',                  text: "Deep breath. I'll walk you through each station, one at a time. Blood pressure first — the easy one." },
+                { speaker: 'You',                      text: "Okay. Okay, I can do this." },
+                { emotion: 'happy',                    text: "That's the spirit. And remember — the results are just information, never a verdict." },
+                { emotion: 'happy',                    text: "Whatever the numbers say, we'll make a plan together. You're not doing this alone anymore." }
+            ]
+        },
+        {
+            id: 'ch2', title: 'Meeting the community', thumb: 'park', unlocked: false,
+            unlockHint: 'Unlock at 30% affinity',
+            teaser: 'A walk in the park, and the first small step toward meeting others on the same path.',
+            lines: [
+                { bg: 'park', emotion: 'happy',        text: "Fresh air! See — health isn't all clinics and forms." },
+                { emotion: 'neutral',                  text: "There's a little community out here. Other people on the same journey as you." },
+                { speaker: 'You',                      text: "I've never been great at meeting new people." },
+                { emotion: 'happy',                    text: "You don't have to say much. Sometimes just walking beside someone is enough." },
+                { emotion: 'surprised', effect: 'shake', text: "Careful — cyclist! ...Okay, crisis averted." },
+                { emotion: 'neutral',                  text: "There's a group doing morning stretches by the pond. Want to just watch first?" },
+                { speaker: 'You',                      text: "...Yeah. Watching sounds okay." },
+                { emotion: 'happy',                    text: "Perfect. Small steps — that's how every streak starts." }
+            ]
+        },
+        {
+            id: 'ch3', title: 'Facing the report', thumb: 'clinic', unlocked: false,
+            unlockHint: 'Unlock at 60% affinity',
+            teaser: 'The results are in. Reading them together — because numbers are just information.'
+        },
+        {
+            id: 'ch4', title: 'The annual quest', thumb: 'park', unlocked: false,
+            unlockHint: 'Unlock at 85% affinity',
+            teaser: 'Turning one check-up into a lasting, once-a-year healthy habit.'
+        }
     ];
 
     let conversationId = '';
@@ -810,6 +1164,7 @@
     function openSheet(name) {
         setMenuOpen(false);
         if (name === 'history') renderHistory();
+        if (name === 'story') renderStoryList();
         const sheet = sheetOverlay.querySelector('.sheet[data-sheet="' + name + '"]');
         if (!sheet) return;
         sheetOverlay.classList.add('active');
@@ -825,7 +1180,10 @@
     }
 
     document.querySelectorAll('.menu-row').forEach(row => {
-        row.addEventListener('click', () => openSheet(row.dataset.sheet));
+        row.addEventListener('click', () => {
+            if (row.dataset.action === 'assistant') { setMenuOpen(false); openAssistant(); return; }
+            openSheet(row.dataset.sheet);
+        });
     });
     document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheets));
     sheetOverlay.addEventListener('click', e => { if (e.target === sheetOverlay) closeSheets(); });
@@ -855,10 +1213,20 @@
         const userText = input.value.trim();
         if (!userText) return;
 
-        showUserBubble(userText);
         chatHistory.push({ role: 'user', content: userText });
         input.value = '';
         input.focus();
+
+        // Show the "thinking" affordance right away, tuned to the current mode.
+        let assistantThinkingBubble = null;
+        if (currentMode === 'assistant') {
+            appendAssistantMsg('user', userText);
+            assistantThinkingBubble = appendAssistantMsg('bot', '');
+            assistantThinkingBubble.innerHTML = THINKING_DOTS;
+        } else {
+            showUserBubble(userText);
+            showThinking();
+        }
 
         try {
             const response = await fetch(API_URL, {
@@ -889,14 +1257,222 @@
             }
 
             chatHistory.push({ role: 'assistant', content: chibaText });
-            splitAndShowResponse(chibaText, chibaEmotion);
+
+            if (currentMode === 'assistant') {
+                if (assistantThinkingBubble) { assistantThinkingBubble.innerHTML = ''; assistantThinkingBubble.textContent = chibaText; }
+                scrollAssistant();
+            } else {
+                hideThinking();
+                splitAndShowResponse(chibaText, chibaEmotion);
+            }
         } catch (error) {
             console.error('Request failed:', error);
-            setCharacterEmotion('sad');
-            setDialogueText('(Chiba seems to be offline — give it a moment and try again.)');
-            setTimeout(() => hideDialogueBubble(), 5000);
+            const offline = '(Chiba is offline right now — give it a moment and try again.)';
+            if (currentMode === 'assistant') {
+                if (assistantThinkingBubble) { assistantThinkingBubble.innerHTML = ''; assistantThinkingBubble.textContent = offline; }
+                scrollAssistant();
+            } else {
+                hideThinking();
+                setCharacterEmotion('sad');
+                setDialogueText(offline);
+                setTimeout(() => hideDialogueBubble(), 5000);
+            }
         }
     }
+
+    /* ===== Story / visual-novel engine ===== */
+    const vnStage = document.getElementById('vnStage');
+    const vnBg = document.getElementById('vnBg');
+    const vnSprite = document.getElementById('vnSprite');
+    const vnCg = document.getElementById('vnCg');
+    const vnFlash = document.getElementById('vnFlash');
+    const vnWho = document.getElementById('vnWho');
+    const vnTextEl = document.getElementById('vnText');
+    const vnNext = document.getElementById('vnNext');
+    const vnChapterTitle = document.getElementById('vnChapterTitle');
+    const vnEnd = document.getElementById('vnEnd');
+
+    let vnChapter = null, vnIndex = 0, vnTyping = false, vnTypeTimer = null, vnFullText = '';
+
+    const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+    const ICON_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+
+    function renderStoryList() {
+        const list = document.getElementById('storyList');
+        list.innerHTML = '';
+        STORY_DATA.forEach(ch => {
+            const card = document.createElement('div');
+            card.className = 'story-card' + (ch.unlocked ? '' : ' locked');
+            const bg = STORY_BG[ch.thumb] || {};
+            const thumbStyle = ch.unlocked
+                ? "background-image:url('" + ASSET_BASE + (bg.image || '') + "'), " + (bg.fallback || 'linear-gradient(135deg,#cbd5e3,#e3e9f1)')
+                : "background:#dfe1e6";
+            card.innerHTML =
+                '<div class="story-thumb" style="' + thumbStyle + '">' + (ch.unlocked ? '' : ICON_LOCK) + '</div>' +
+                '<div class="story-info"><div class="story-name"></div><div class="story-teaser"></div></div>' +
+                (ch.unlocked ? '<div class="story-go">' + ICON_PLAY + '</div>' : '');
+            card.querySelector('.story-name').textContent = ch.title;
+            card.querySelector('.story-teaser').textContent = ch.unlocked ? ch.teaser : (ch.unlockHint || 'Locked');
+            if (ch.unlocked) card.addEventListener('click', () => startChapter(ch.id));
+            list.appendChild(card);
+        });
+    }
+
+    function startChapter(id) {
+        const ch = STORY_DATA.find(c => c.id === id);
+        if (!ch || !ch.unlocked || !ch.lines) return;
+        vnChapter = ch; vnIndex = 0;
+        vnChapterTitle.textContent = ch.title;
+        vnEnd.classList.remove('show');
+        vnCg.classList.remove('show'); vnCg.style.display = 'none';
+        vnSprite.style.opacity = '1';
+        closeSheets();
+        vnStage.classList.add('active');
+        showVnLine(0);
+    }
+
+    function showVnLine(i) {
+        const line = vnChapter && vnChapter.lines[i];
+        if (!line) { vnEnd.classList.add('show'); return; }
+
+        if (line.bg && STORY_BG[line.bg]) {
+            const bg = STORY_BG[line.bg];
+            vnBg.style.backgroundImage = "url('" + ASSET_BASE + bg.image + "'), " + bg.fallback;
+        }
+        if (line.cg && STORY_CG[line.cg]) {
+            vnCg.style.display = 'block';
+            vnCg.onerror = () => { vnCg.classList.remove('show'); vnCg.style.display = 'none'; };
+            vnCg.src = ASSET_BASE + STORY_CG[line.cg];
+            requestAnimationFrame(() => vnCg.classList.add('show'));
+        } else {
+            vnCg.classList.remove('show');
+            setTimeout(() => { if (!vnCg.classList.contains('show')) vnCg.style.display = 'none'; }, 460);
+        }
+        if (line.emotion) {
+            const media = emotionMediaMap[line.emotion] || emotionMediaMap.neutral;
+            vnSprite.style.opacity = '1';
+            vnSprite.src = ASSET_BASE + media.image;
+        }
+        const who = line.speaker || 'Chiba';
+        vnWho.textContent = who;
+        vnWho.classList.toggle('you', who.toLowerCase() === 'you');
+
+        if (line.effect) applyVnEffect(line.effect);
+        typeVnText(line.text || '');
+    }
+
+    function typeVnText(text) {
+        clearInterval(vnTypeTimer);
+        vnFullText = text; vnTyping = true;
+        vnTextEl.textContent = '';
+        vnNext.style.display = 'none';
+        const chars = Array.from(text);
+        let i = 0;
+        vnTypeTimer = setInterval(() => {
+            vnTextEl.textContent += chars[i++];
+            if (i >= chars.length) {
+                clearInterval(vnTypeTimer); vnTyping = false;
+                vnNext.style.display = 'inline-flex';
+            }
+        }, 24);
+    }
+
+    function advanceVn() {
+        if (vnEnd.classList.contains('show')) return;
+        if (vnTyping) {
+            clearInterval(vnTypeTimer); vnTyping = false;
+            vnTextEl.textContent = vnFullText;
+            vnNext.style.display = 'inline-flex';
+            return;
+        }
+        vnIndex++;
+        showVnLine(vnIndex);
+    }
+
+    function applyVnEffect(effect) {
+        if (effect === 'shake') {
+            vnStage.classList.remove('shake'); void vnStage.offsetWidth; vnStage.classList.add('shake');
+            setTimeout(() => vnStage.classList.remove('shake'), 550);
+        } else if (effect === 'flash') {
+            vnFlash.classList.remove('fire'); void vnFlash.offsetWidth; vnFlash.classList.add('fire');
+            setTimeout(() => vnFlash.classList.remove('fire'), 600);
+        }
+    }
+
+    function closeVn(toList) {
+        clearInterval(vnTypeTimer); vnTyping = false;
+        vnStage.classList.remove('active');
+        vnEnd.classList.remove('show');
+        if (toList) setTimeout(() => openSheet('story'), 180);
+    }
+
+    vnStage.addEventListener('click', (e) => {
+        if (e.target.closest('#vnClose') || e.target.closest('#vnEnd')) return;
+        advanceVn();
+    });
+    document.getElementById('vnClose').addEventListener('click', (e) => { e.stopPropagation(); closeVn(false); });
+    document.getElementById('vnEndBtn').addEventListener('click', (e) => { e.stopPropagation(); closeVn(true); });
+
+    /* ===== Decorate: Backgrounds / Outfits tab switch (view only) ===== */
+    document.querySelectorAll('.decorate-seg div').forEach((seg, idx) => {
+        seg.addEventListener('click', () => {
+            document.querySelectorAll('.decorate-seg div').forEach(s => s.classList.remove('on'));
+            seg.classList.add('on');
+            document.getElementById('bgGrid').style.display = idx === 0 ? 'grid' : 'none';
+            document.getElementById('outfitGrid').style.display = idx === 1 ? 'grid' : 'none';
+        });
+    });
+
+    /* ===== "Chiba is thinking" state (companion mode) ===== */
+    const THINKING_DOTS = '<span class="typing-dots"><i></i><i></i><i></i></span>';
+    function showThinking() {
+        dialogueText.innerHTML = THINKING_DOTS;
+        dialogueBubble.style.opacity = '1';
+        characterContainer.classList.add('thinking');
+    }
+    function hideThinking() { characterContainer.classList.remove('thinking'); }
+
+    /* ===== Plain-assistant mode ===== */
+    let currentMode = 'companion';
+    const assistantPanel = document.getElementById('assistantPanel');
+    const assistantThread = document.getElementById('assistantThread');
+    const userInputEl = document.getElementById('userInput');
+
+    function openAssistant() {
+        currentMode = 'assistant';
+        renderAssistantThread();
+        assistantPanel.classList.add('active');
+        userInputEl.placeholder = 'Ask Chiba anything…';
+    }
+    function closeAssistant() {
+        currentMode = 'companion';
+        assistantPanel.classList.remove('active');
+        userInputEl.placeholder = 'Say something to Chiba…';
+    }
+    function scrollAssistant() { assistantThread.scrollTop = assistantThread.scrollHeight; }
+    function renderAssistantThread() {
+        assistantThread.innerHTML = '';
+        if (chatHistory.length === 0) {
+            assistantThread.innerHTML = '<div class="a-empty">Assistant mode open</div>';
+            return;
+        }
+        chatHistory.forEach(m => appendAssistantMsg(m.role, m.content, false));
+        scrollAssistant();
+    }
+    function appendAssistantMsg(role, text, scroll) {
+        const empty = assistantThread.querySelector('.a-empty');
+        if (empty) empty.remove();
+        const wrap = document.createElement('div');
+        wrap.className = 'a-msg ' + (role === 'user' ? 'user' : 'bot');
+        const b = document.createElement('div');
+        b.className = 'a-bubble';
+        b.textContent = text;
+        wrap.appendChild(b);
+        assistantThread.appendChild(wrap);
+        if (scroll !== false) scrollAssistant();
+        return b;
+    }
+    document.getElementById('assistantBack').addEventListener('click', closeAssistant);
 
     window.addEventListener('load', showRandomOpening);
 </script>
