@@ -389,8 +389,10 @@ const CONFIG = {
     loadingEl.hidden = false;
     proto.src = embedUrl;
     clearTimeout(stallTimer);
-    /* Figma normally answers in a few seconds. Past this, something is
-       wrong and the person deserves to be told which something. */
+    /* A warm start answers in a second or two. A cold one pulls several
+       megabytes from Figma, which on a slow connection genuinely can
+       take this long — hence the wide window. Loading carries on behind
+       the card, and a late success clears it on its own. */
     stallTimer = setTimeout(function(){
       if (protoLoaded) return;
       loadingEl.hidden = true;
@@ -401,7 +403,7 @@ const CONFIG = {
         ? "It streams from Figma, which hasn’t answered. Check the network, and that the prototype is still shared with anyone who has the link."
         : "The prototype and Chiba both need network.";
       stalledEl.hidden = false;
-    }, 12000);
+    }, 18000);
   }
 
   document.getElementById("retry").addEventListener("click", loadProto);
