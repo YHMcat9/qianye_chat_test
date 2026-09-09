@@ -13,6 +13,10 @@
 <meta name="apple-mobile-web-app-title" content="Sprout">
 <link rel="apple-touch-icon" href="./icon-192.png">
 
+<link rel="preconnect" href="https://embed.figma.com" crossorigin>
+<link rel="preconnect" href="https://www.figma.com" crossorigin>
+<link rel="dns-prefetch" href="https://embed.figma.com">
+
 <style>
   /* ---------------------------------------------------------------
      Sprout shell
@@ -161,6 +165,25 @@
   #chatWrap{flex:1 1 auto;position:relative;background:#fff}
   #chatWrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
 
+  /* --- loading state ----------------------------------------------
+     Without this, a slow Figma and a failed Figma look identical: a
+     blank panel. Anything is better than silence. */
+  #loading{
+    position:absolute;inset:0;z-index:12;
+    display:grid;place-content:center;justify-items:center;gap:16px;
+    background:var(--paper);
+  }
+  #loading[hidden]{display:none}
+  .spin{
+    width:30px;height:30px;border-radius:50%;
+    border:3px solid rgba(55,138,221,.2);
+    border-top-color:var(--blue);
+    animation:spin .9s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #loading p{margin:0;font-size:13.5px;color:#7A8CA8}
+  @media (prefers-reduced-motion:reduce){ .spin{animation-duration:2.4s} }
+
   /* --- status cards ----------------------------------------------- */
   .card{
     position:absolute;left:20px;right:20px;top:50%;transform:translateY(-50%);
@@ -275,10 +298,15 @@ const CONFIG = {
       <button onclick="document.getElementById('setup').hidden=true">Continue anyway</button>
     </div>
 
-    <div class="card" id="offline" hidden>
-      <h1>No connection</h1>
-      <p>The prototype streams from Figma, so it needs network. Chiba does too.</p>
-      <button onclick="location.reload()">Try again</button>
+    <div id="loading">
+      <div class="spin"></div>
+      <p>Loading prototype…</p>
+    </div>
+
+    <div class="card" id="stalled" hidden>
+      <h1 id="stalledTitle">Prototype didn’t load</h1>
+      <p id="stalledBody"></p>
+      <button id="retry">Try again</button>
     </div>
   </div>
 </div>
@@ -343,7 +371,43 @@ const CONFIG = {
     document.getElementById("setup").hidden = false;
   }
 
-  proto.src = toEmbedUrl(CONFIG.FIGMA_PROTO_URL);
+  var embedUrl = toEmbedUrl(CONFIG.FIGMA_PROTO_URL);
+  var loadingEl = document.getElementById("loading");
+  var stalledEl = document.getElementById("stalled");
+  var protoLoaded = false, stallTimer = null;
+
+  proto.addEventListener("load", function(){
+    protoLoaded = true;
+    clearTimeout(stallTimer);
+    loadingEl.hidden = true;
+    stalledEl.hidden = true;
+  });
+
+  function loadProto(){
+    protoLoaded = false;
+    stalledEl.hidden = true;
+    loadingEl.hidden = false;
+    proto.src = embedUrl;
+    clearTimeout(stallTimer);
+    /* Figma normally answers in a few seconds. Past this, something is
+       wrong and the person deserves to be told which something. */
+    stallTimer = setTimeout(function(){
+      if (protoLoaded) return;
+      loadingEl.hidden = true;
+      var online = navigator.onLine;
+      document.getElementById("stalledTitle").textContent =
+        online ? "Prototype didn’t load" : "No connection";
+      document.getElementById("stalledBody").textContent = online
+        ? "It streams from Figma, which hasn’t answered. Check the network, and that the prototype is still shared with anyone who has the link."
+        : "The prototype and Chiba both need network.";
+      stalledEl.hidden = false;
+    }, 12000);
+  }
+
+  document.getElementById("retry").addEventListener("click", loadProto);
+  window.addEventListener("online", function(){ if (!protoLoaded) loadProto(); });
+
+  loadProto();
 
   /* ---- Chiba button -------------------------------------------- */
   if (CONFIG.FAB_MODE !== "off"){
@@ -462,12 +526,6 @@ const CONFIG = {
       y0 = null;
     });
   })();
-
-  /* ---- offline notice ------------------------------------------ */
-  function checkNet(){ document.getElementById("offline").hidden = navigator.onLine; }
-  window.addEventListener("online", checkNet);
-  window.addEventListener("offline", checkNet);
-  checkNet();
 
   /* ---- talking to the prototype --------------------------------
      Figma's Embed API only speaks to a logged-in Figma session, and
