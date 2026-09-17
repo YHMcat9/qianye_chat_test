@@ -165,25 +165,6 @@
   #chatWrap{flex:1 1 auto;position:relative;background:#fff}
   #chatWrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
 
-  /* --- loading state ----------------------------------------------
-     Without this, a slow Figma and a failed Figma look identical: a
-     blank panel. Anything is better than silence. */
-  #loading{
-    position:absolute;inset:0;z-index:12;
-    display:grid;place-content:center;justify-items:center;gap:16px;
-    background:var(--paper);
-  }
-  #loading[hidden]{display:none}
-  .spin{
-    width:30px;height:30px;border-radius:50%;
-    border:3px solid rgba(55,138,221,.2);
-    border-top-color:var(--blue);
-    animation:spin .9s linear infinite;
-  }
-  @keyframes spin{to{transform:rotate(360deg)}}
-  #loading p{margin:0;font-size:13.5px;color:#7A8CA8}
-  @media (prefers-reduced-motion:reduce){ .spin{animation-duration:2.4s} }
-
   /* --- status cards ----------------------------------------------- */
   .card{
     position:absolute;left:20px;right:20px;top:50%;transform:translateY(-50%);
@@ -203,15 +184,6 @@
     border:0;border-radius:11px;background:var(--blue);color:#fff;
     font:inherit;font-weight:600;padding:11px 18px;cursor:pointer;
   }
-  .card .actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
-  .card .button{
-    display:inline-flex;align-items:center;justify-content:center;
-    border:0;border-radius:11px;background:var(--blue);color:#fff;
-    font:inherit;font-weight:600;padding:11px 18px;cursor:pointer;
-    text-decoration:none;
-  }
-  .card .secondary{background:#E8EEF7;color:var(--ink)}
-  .card button[hidden],.card .button[hidden]{display:none}
   .card[hidden]{display:none}
 </style>
 </head>
@@ -307,20 +279,6 @@ const CONFIG = {
       <button onclick="document.getElementById('setup').hidden=true">Continue anyway</button>
     </div>
 
-    <div id="loading">
-      <div class="spin"></div>
-      <p>Loading prototype…</p>
-    </div>
-
-    <div class="card" id="stalled" hidden>
-      <h1 id="stalledTitle">Prototype didn’t load</h1>
-      <p id="stalledBody"></p>
-      <div class="actions">
-        <a class="button" id="activateFigma" target="_blank" rel="noopener noreferrer">Open Figma once</a>
-        <button class="secondary" id="continueProto" type="button">Continue</button>
-        <button class="secondary" id="retry" type="button">Try again</button>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -385,125 +343,18 @@ const CONFIG = {
   }
 
   var embedUrl = toEmbedUrl(CONFIG.FIGMA_PROTO_URL);
-  var loadingEl = document.getElementById("loading");
-  var stalledEl = document.getElementById("stalled");
-  var stalledTitleEl = document.getElementById("stalledTitle");
-  var stalledBodyEl = document.getElementById("stalledBody");
-  var retryB = document.getElementById("retry");
-  var continueB = document.getElementById("continueProto");
-  var activateLink = document.getElementById("activateFigma");
-  var READY_KEY = "sprout:figma-prototype-ready:v1";
-  var protoReady = false;
-  var frameAnswered = false;
-  var waitingForFigmaReturn = false;
-  var loadAttempt = 0;
-  var stallTimer = null, settleTimer = null;
-
-  activateLink.href = CONFIG.FIGMA_PROTO_URL;
-
-  function hasReadyHint(){
-    try { return localStorage.getItem(READY_KEY) === "1"; }
-    catch(e){ return false; }
-  }
-
-  function rememberReady(){
-    try { localStorage.setItem(READY_KEY, "1"); } catch(e){}
-  }
-
-  function clearProtoTimers(){
-    clearTimeout(stallTimer);
-    clearTimeout(settleTimer);
-  }
-
-  function markPrototypeReady(remember){
-    protoReady = true;
-    frameAnswered = true;
-    clearProtoTimers();
-    loadingEl.hidden = true;
-    stalledEl.hidden = true;
-    if (remember) rememberReady();
-  }
-
-  function showStatus(title, body, options){
-    options = options || {};
-    loadingEl.hidden = true;
-    stalledTitleEl.textContent = title;
-    stalledBodyEl.textContent = body;
-    activateLink.hidden = !options.activate;
-    continueB.hidden = !options.continue;
-    retryB.hidden = !options.retry;
-    stalledEl.hidden = false;
-  }
-
-  function showFirstRunHelp(){
-    showStatus(
-      "Slow response speed",
-      "If the prototype is visible around this message, choose Continue. If it is blank, please ask for the designer.",
-      { activate:true, continue:true, retry:true }
-    );
-  }
+  var protoLoaded = false;
 
   proto.addEventListener("load", function(){
-    frameAnswered = true;
-    clearTimeout(stallTimer);
-
-    /* iframe load only means that Figma returned a document. An auth,
-       cookie or error page fires the same event, and the browser will not
-       let this page inspect cross-origin Figma content. If this device has
-       already confirmed a good load, reveal it after a short paint window.
-       Otherwise keep a one-time recovery path visible instead of exposing
-       an unexplained white screen. INITIAL_LOAD below remains the strongest
-       signal when the Embed API is configured and available. */
-    var thisAttempt = loadAttempt;
-    settleTimer = setTimeout(function(){
-      if (thisAttempt !== loadAttempt || protoReady) return;
-      if (hasReadyHint()) markPrototypeReady(false);
-      else showFirstRunHelp();
-    }, hasReadyHint() ? 1800 : 5000);
+    protoLoaded = true;
   });
 
   function loadProto(){
-    loadAttempt += 1;
-    protoReady = false;
-    frameAnswered = false;
-    clearProtoTimers();
-    stalledEl.hidden = true;
-    loadingEl.hidden = false;
+    protoLoaded = false;
     proto.src = embedUrl;
-    /* A warm start answers in a second or two. A cold one pulls several
-       megabytes from Figma, which on a slow connection genuinely can
-       take this long — hence the wide window. */
-    var thisAttempt = loadAttempt;
-    stallTimer = setTimeout(function(){
-      if (thisAttempt !== loadAttempt || protoReady || frameAnswered) return;
-      var online = navigator.onLine;
-      showStatus(
-        online ? "Prototype didn’t load" : "No connection",
-        online
-          ? "Figma has not answered. Check the network and confirm that the prototype is shared with anyone who has the link."
-          : "The prototype and Chiba both need a network connection.",
-        { activate:online, continue:false, retry:true }
-      );
-    }, 18000);
   }
 
-  retryB.addEventListener("click", loadProto);
-  continueB.addEventListener("click", function(){ markPrototypeReady(true); });
-  activateLink.addEventListener("click", function(){
-    waitingForFigmaReturn = true;
-    stalledBodyEl.textContent =
-      "After Figma opens, wait until the prototype appears, then return to Sprout.";
-  });
-
-  function retryAfterFigmaReturn(){
-    if (!waitingForFigmaReturn || document.visibilityState === "hidden") return;
-    waitingForFigmaReturn = false;
-    setTimeout(loadProto, 350);
-  }
-
-  document.addEventListener("visibilitychange", retryAfterFigmaReturn);
-  window.addEventListener("focus", retryAfterFigmaReturn);
-  window.addEventListener("online", function(){ if (!protoReady) loadProto(); });
+  window.addEventListener("online", function(){ if (!protoLoaded) loadProto(); });
 
   loadProto();
 
@@ -657,7 +508,7 @@ const CONFIG = {
 
     if (d.type === "INITIAL_LOAD"){
       log("[figma] prototype loaded");
-      markPrototypeReady(true);
+      protoLoaded = true;
       /* The API answered, so the in-prototype entry works on this device. */
       if (CONFIG.FAB_MODE === "fallback" && hooks.length && !fab.hidden){
         fab.style.opacity = "0";

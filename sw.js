@@ -9,7 +9,7 @@
  * Chiba talks to the Vercel proxy — both must always go to the network.
  */
 
-const CACHE = "sprout-v12";
+const CACHE = "sprout-v14";
 
 const PRECACHE = [
   "./app.html",
